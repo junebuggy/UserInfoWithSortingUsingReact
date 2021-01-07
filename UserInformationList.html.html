@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script crossorigin="anonymous" src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<script crossorigin="anonymous" src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/react@16/umd/react.development.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+<script crossorigin="anonymous" src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+
+<style>
+#users_table {
+  font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#users_table td, #users_table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+#users_table tr:nth-child(even){background-color: #f2f2f2;}
+
+
+#users_table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #6579fc;
+  color: white;
+}
+</style>
+
+</head>
+	
+<body>
+<div id="user_info" ></div>
+
+
+<script type="text/babel">
+//component handles and generate the headers of the table
+class TableHeader extends React.Component {
+    render() {
+		const {onClick} = this.props
+        return (
+            <thead>
+				<tr>
+					{this.props.headers.map((header, key) =>
+					<th onClick={() => onClick(this.props.headerReference[key])} key={key} >{header}</th>
+					)}
+				</tr>
+            </thead>
+        );
+    }
+}
+
+//component handles and generate the rows with the users' information
+class UserTableRows extends React.Component {
+    render() {
+        return (
+            <tr>
+				<td>{this.props.user.gender}</td>
+				<td>{this.props.user.name.first}</td>
+				<td>{this.props.user.name.last}</td>
+				<td>{this.props.user.nat}</td>
+				<td>{this.props.formatDob(this.props.user.dob)}</td>
+				<td>{this.props.checkBirthdayStatus(this.props.user.dob)}</td>
+            </tr>
+        );
+    }
+}
+
+//main component 
+class UsersInfo extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = { users: [],
+			tableHeader: ["Gender", "First Name", "Last Name", "Country", 
+			"Date Of Birth", "Birthday"],
+			headerReference: ["gender", "name.first", "name.last", "nat", "dob", "bday"],
+			sortStatus: ({"headerRef":""})
+		};
+		
+		this.formatDob = this.formatDob.bind(this);
+		this.checkBirthdayStatus = this.checkBirthdayStatus.bind(this);
+		this.compareBy = this.compareBy.bind(this);
+		this.sortBy = this.sortBy.bind(this);
+	}
+	
+	componentDidMount() {
+		axios.get('https://randomuser.me/api/?results=20&nat=ca,us')
+		.then((response) => {
+			// handle success
+			this.setState({users: response.data.results});
+			
+		})
+		.catch((error) => {
+			// handle error
+			console.log(error);
+		});
+		
+		
+	}
+	
+	//function to be used for sorting
+	compareBy = (objectKey) => {
+		return (a, b) => {
+			if(!(this.state.sortStatus.headerRef == objectKey)){
+				
+				if(objectKey == "dob"){
+					let formatedA = this.formatDob(a[objectKey]);
+					let formatedB = this.formatDob(b[objectKey]);
+					if(formatedA < formatedB) return -1;
+					if(formatedA > formatedB) return 1;
+					return 0;
+				}else if(objectKey == "bday"){
+					let formatedA = this.checkBirthdayStatus(a["dob"]);
+					let formatedB = this.checkBirthdayStatus(b["dob"]);
+					if(formatedA < formatedB) return -1;
+					if(formatedA > formatedB) return 1;
+					return 0;
+				}
+				else if(objectKey.includes("name")){
+					let nameKey = objectKey.slice(5);
+					if(a["name"][nameKey] < b["name"][nameKey]) return -1;
+					if(a["name"][nameKey] > b["name"][nameKey]) return 1;
+					return 0;
+				}
+				else{
+					if(a[objectKey] < b[objectKey]) return -1;
+					if(a[objectKey] > b[objectKey]) return 1;
+					return 0;
+				}
+			}else{
+				if(objectKey == "dob"){
+					let formatedA = this.formatDob(a[objectKey]);
+					let formatedB = this.formatDob(b[objectKey]);
+					if(formatedA > formatedB) return -1;
+					if(formatedA < formatedB) return 1;
+					return 0;
+				}else if(objectKey == "bday"){
+					let formatedA = this.checkBirthdayStatus(a["dob"]);
+					let formatedB = this.checkBirthdayStatus(b["dob"]);
+					if(formatedA > formatedB) return -1;
+					if(formatedA < formatedB) return 1;
+					return 0;
+				}
+				else if(objectKey.includes("name")){
+					let nameKey = objectKey.slice(5);
+					if(a["name"][nameKey] > b["name"][nameKey]) return -1;
+					if(a["name"][nameKey] < b["name"][nameKey]) return 1;
+					return 0;
+				}
+				else{
+					if(a[objectKey] > b[objectKey]) return -1;
+					if(a[objectKey] < b[objectKey]) return 1;
+					return 0;
+				}
+			}
+			
+		};
+	}
+	
+	//function that sorts users and update the state with the sorted user
+	sortBy(objectKey){
+		let copyUsers = this.state.users;
+		copyUsers.sort(this.compareBy(objectKey));
+		let newCurState = this.state;
+		newCurState.users = copyUsers;
+		
+		//check if the the header field is select or not to do ascending and descending sorting
+		if(this.state.sortStatus.headerRef == objectKey){
+			newCurState.sortStatus.headerRef = "";
+		}
+		else{
+			newCurState.sortStatus.headerRef = objectKey;
+			
+		}
+		this.setState(newCurState);
+	}
+	
+	//function that converts dates to year-month-day format
+	formatDob(dob){
+		let newDay = $.datepicker.formatDate('yy-mm-dd', new Date(dob.date));
+		return newDay;
+	}
+	
+	//function that checks if the birthday is current, past, or ahead
+	checkBirthdayStatus(dob){
+		//get the current day to use to compare for birthdays
+		let currentDay = new Date($.datepicker.formatDate('mm-dd-yy', new Date()));
+		let birthday = "";
+		
+		//get user date of birth and convert to current year to confirm birthday
+		let userDob = Date.parse($.datepicker.formatDate('mm-dd', new Date(dob.date))+"-"+currentDay.getFullYear());
+		
+		//compare the current day with the modify user birthday
+		if(currentDay.getTime() == userDob){
+			birthday = "is today(!)";
+		} else if(currentDay.getTime() < userDob){
+			birthday = "has yet to occur";
+		} else {
+			birthday = "already happened";
+		}
+		
+		return birthday;
+	}
+	
+	render() {
+		return (
+			<div>
+				<table id="users_table">
+					<TableHeader headers={this.state.tableHeader} 
+						headerReference={this.state.headerReference} 
+						onClick={this.sortBy} />
+					<tbody>
+						{this.state.users.map((user,key) =>
+							<UserTableRows key={key} user={user} formatDob={this.formatDob} 
+							 checkBirthdayStatus={this.checkBirthdayStatus} />
+						)}
+					</tbody>
+				</table>
+			</div>
+		);
+	}
+}
+
+ReactDOM.render(
+  <UsersInfo />,
+  document.getElementById('user_info')
+);
+
+</script>
+
+
+</body>
+</html>
